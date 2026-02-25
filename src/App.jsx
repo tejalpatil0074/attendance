@@ -55,7 +55,8 @@ export default function App() {
     if (selectedFile) setFile(selectedFile);
   };
 
-  const handleGenerate = () => {
+  // --- UPDATED API CALL ---
+  const handleGenerate = async () => {
     if (!file) {
       alert("Please upload a data file first.");
       return;
@@ -68,52 +69,44 @@ export default function App() {
     setIsGenerating(true);
     setGeneratedData(null);
 
-    // Simulate API Call / Processing Delay
-    setTimeout(() => {
-      let mockColumns = [];
-      let mockRows = [];
-
-      if (reportType === 'daily' && reportScope === 'office') {
-        mockColumns = ["Emp ID", "Name", "Department", "Check In", "Check Out", "Status", "Hours"];
-        mockRows = [
-          { id: "EMP001", name: "Alice Smith", dept: "Engineering", in: "08:50 AM", out: "05:10 PM", status: "Present", hours: "8h 20m" },
-          { id: "EMP002", name: "Bob Jones", dept: "Marketing", in: "09:15 AM", out: "06:00 PM", status: "Late", hours: "8h 45m" },
-          { id: "EMP003", name: "Charlie Davis", dept: "Sales", in: "--", out: "--", status: "Absent", hours: "0h 0m" },
-          { id: "EMP004", name: "Diana Prince", dept: "HR", in: "08:55 AM", out: "05:05 PM", status: "Present", hours: "8h 10m" },
-        ];
-      } else if (reportType === 'daily' && reportScope === 'employee') {
-        mockColumns = ["Date", "Emp ID", "Name", "Check In", "Check Out", "Status", "Location"];
-        mockRows = [
-          { date: selectedDate, id: employeeId, name: "Employee Name", in: "09:00 AM", out: "05:30 PM", status: "Present", loc: "HQ Office" },
-        ];
-      } else if (reportType === 'monthly' && reportScope === 'office') {
-        mockColumns = ["Emp ID", "Name", "Total Days", "Present", "Absent", "Late", "Avg Hours"];
-        mockRows = [
-          { id: "EMP001", name: "Alice Smith", days: 22, present: 22, absent: 0, late: 1, avg: "8.4h" },
-          { id: "EMP002", name: "Bob Jones", days: 22, present: 20, absent: 2, late: 4, avg: "7.9h" },
-          { id: "EMP003", name: "Charlie Davis", days: 22, present: 21, absent: 1, late: 0, avg: "8.1h" },
-        ];
-      } else if (reportType === 'monthly' && reportScope === 'employee') {
-        mockColumns = ["Date", "Day", "Check In", "Check Out", "Status", "Hours"];
-        mockRows = [
-          { date: `${selectedMonth}-01`, day: "Monday", in: "09:00 AM", out: "05:30 PM", status: "Present", hours: "8.5h" },
-          { date: `${selectedMonth}-02`, day: "Tuesday", in: "09:10 AM", out: "05:40 PM", status: "Late", hours: "8.5h" },
-          { date: `${selectedMonth}-03`, day: "Wednesday", in: "--", out: "--", status: "Absent", hours: "0h" },
-          { date: `${selectedMonth}-04`, day: "Thursday", in: "08:55 AM", out: "05:00 PM", status: "Present", hours: "8h 5m" },
-        ];
+    try {
+      // 1. Prepare data to send to your backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('reportType', reportType);
+      formData.append('reportScope', reportScope);
+      formData.append('targetDate', selectedDate);
+      formData.append('targetMonth', selectedMonth);
+      
+      if (reportScope === 'employee') {
+        formData.append('employeeId', employeeId);
       }
 
-      setGeneratedData({
-        title: `${reportType === 'daily' ? 'Daily' : 'Monthly'} Attendance Report`,
-        subtitle: reportScope === 'office' ? 'Entire Office' : `Employee: ${employeeId}`,
-        dateStr: reportType === 'daily' ? selectedDate : selectedMonth,
-        columns: mockColumns,
-        rows: mockRows
+      // 2. Make the API Call
+      // IMPORTANT: Replace 'https://your-backend-api.com/generate-report' with your actual backend URL
+      const response = await fetch('https://your-backend-api.com/generate-report', {
+        method: 'POST',
+        body: formData, // Do NOT set Content-Type header manually when sending FormData, the browser sets the boundary automatically
       });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`);
+      }
+
+      // 3. Parse the JSON response from your backend
+      const data = await response.json();
+      
+      // 4. Update the UI state with backend data
+      setGeneratedData(data);
+
+    } catch (error) {
+      console.error("Error generating report:", error);
+      alert("Failed to connect to the server or process the report. Please try again.");
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
-8
+
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-slate-50 to-white p-4 md:p-8 font-sans text-slate-800 selection:bg-indigo-200">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -270,7 +263,7 @@ export default function App() {
             >
               {isGenerating && (
                 <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_1.5s_infinite] -skew-x-12 translate-x-[-100%]" 
-                     style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
+                      style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
               )}
               {isGenerating ? (
                 <>
@@ -333,14 +326,15 @@ export default function App() {
                     <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                       <thead className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
                         <tr>
-                          {generatedData.columns.map((col, idx) => (
+                          {generatedData.columns?.map((col, idx) => (
                             <th key={idx} className="px-5 py-4 font-bold text-slate-700 border-b border-slate-200 uppercase tracking-wider text-xs">{col}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {generatedData.rows.map((row, rIdx) => (
+                        {generatedData.rows?.map((row, rIdx) => (
                           <tr key={rIdx} className="hover:bg-indigo-50/40 transition-colors group">
+                            {/* We iterate over the values of the row object returned by the backend */}
                             {Object.values(row).map((val, vIdx) => (
                               <td key={vIdx} className={`px-5 py-3.5 text-slate-600 font-medium ${vIdx === 0 ? 'text-slate-900 font-bold' : ''}`}>
                                 {val === 'Present' ? (
@@ -372,7 +366,7 @@ export default function App() {
                       <FileIcon /> Source: <span className="text-slate-600 truncate max-w-[150px]">{file.name}</span>
                     </div>
                     <div className="bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600">
-                      Showing <span className="font-bold text-indigo-600">{generatedData.rows.length}</span> records
+                      Showing <span className="font-bold text-indigo-600">{generatedData.rows?.length || 0}</span> records
                     </div>
                   </div>
 
